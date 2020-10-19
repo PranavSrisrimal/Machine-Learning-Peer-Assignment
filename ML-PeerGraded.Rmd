@@ -1,0 +1,174 @@
+---
+title: "Machine Learning Peer Graded Assignment"
+author: "Pranav"
+date: "19/10/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##Overview  
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit, it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self-movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behaviour, or because they are tech geeks.  
+The goal of this project is to predict how they did the exercise. There is the "classe" variable in the training set. Create a report describing t model, how cross-validation is used, what are the expected out of sample errors, and the choices. Use a prediction model to predict 20 different test cases.  
+
+##Understanding the Data  
+
+The outcome variable is `classe`, a factor variable with five levels. For this data set, participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in 5 different fashions:
+
+- Class A: precisely according to the specification  
+- Class B: throwing the elbows to the front  
+- Class C: lifting the dumbbell only halfway  
+- Class D: lowering the dumbbell only halfway  
+- Class E: throwing the hips to the front  
+
+##Loading required packages and boot Variables
+
+```{r configuration, echo=TRUE, results='hide'}
+#Data set variable declaration
+train.data   <- 'E:/pml-training.csv'
+test.data <- 'E:/pml-testing.csv'
+train.data.url    <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv'
+test.data.url  <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv'
+
+#Directories
+if (!file.exists("data")){
+  dir.create("data")
+}
+if (!file.exists("data/submission")){
+  dir.create("data/submission")
+}
+#To check if R packages are present
+IscaretInstalled <- require("caret")
+if(!IscaretInstalled){
+    install.packages("caret")
+    library("caret")
+    }
+IsrandomForestInstalled <- require("randomForest")
+if(!IsrandomForestInstalled){
+    install.packages("randomForest")
+    library("randomForest")
+    }
+IsRpartInstalled <- require("rpart")
+if(!IsRpartInstalled){
+    install.packages("rpart")
+    library("rpart")
+    }
+IsRpartPlotInstalled <- require("rpart.plot")
+if(!IsRpartPlotInstalled){
+    install.packages("rpart.plot")
+    library("rpart.plot")
+    }
+# Setting seed for reproducibility 
+set.seed(1010)
+```
+
+## Data Processing  
+Downloading and processing of data is complete. Some transformation and cleaning are to be performed, so that `NA` values are to be dropped. Irrelevant columns (columns 1 to 7) will be removed from the subset.
+
+The `pml-training.csv` data is used to devise training and testing sets.
+The `pml-test.csv` data is used to predict and answer the 20 questions based on the trained model.
+
+```{r dataprocessing, echo=TRUE, results='hide'}
+# Downloading required data
+download.file(train.data.url, train.data)
+download.file(test.data.url,test.data )
+
+# Cleaning the data
+train_data   <-read.csv(train.data, na.strings=c("NA","#DIV/0!", ""))
+test_data <-read.csv(test.data , na.strings=c("NA", "#DIV/0!", ""))
+train_data<-train_data[,colSums(is.na(train_data)) == 0]
+test_data <-test_data[,colSums(is.na(test_data)) == 0]
+
+# Subsetting the data
+train_data   <-train_data[,-c(1:7)]
+test_data <-test_data[,-c(1:7)]
+```
+
+## Cross-validation
+Cross-validation is performed by dividing the training data set into two ratios - training(75%) and testing(25%).
+
+```{r datasplitting, echo=TRUE, results='hide'}
+subvarSams <- createDataPartition(y=train_data$classe, p=0.75, list=FALSE)
+subvarTrain <- train_data[subvarSams, ] 
+subvarTest <- train_data[-subvarSams, ]
+```
+
+## Expected out-of-sample error
+The expected out-of-sample error will correspond to the quantity: 1-accuracy in the cross-validation data. Accuracy is the proportion of correct classified observation over the total sample in the sub-Testing data set. Expected accuracy is the expected accuracy in the out-of-sample data set (i.e. original testing data set). Thus, the expected value of the out-of-sample error will correspond to the expected number of miss-classified observations/total observations in the test data set, which is the quantity: 1-accuracy found from the cross-validation data set.
+
+## Exploratory analysis
+The variable `classe` contains five levels. The plot of the outcome variable shows the frequency of each level in the sub-Training data.
+
+```{r exploranalysis, echo=TRUE}
+plot(subvarTrain$classe, col="blue", main="Various Levels of outcome variable classe", xlab="Classe Levels", ylab="Frequency")
+```
+
+The plot tells us that Level A is the most frequent and D is the least frequent.
+
+## Prediction models
+In this section, a decision tree and random forest will be applied to the data.
+
+### Decision tree
+```{r decisiontree, echo=TRUE}
+# Fit model
+modelFyDT <- rpart(classe ~ ., data=subvarTrain, method="class")
+# Perform prediction
+predictDT <- predict(modelFyDT, subvarTest, type = "class")
+# Plot result
+rpart.plot(modelFyDT, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+```
+
+Following confusion, the matrix shows the errors of the prediction algorithm.
+
+```{r decisiontreecm, echo=TRUE}
+confusionMatrix(predictDT, subvarTest$classe)
+```
+
+### Random forest
+```{r randomforest, echo=TRUE}
+# Fit model
+modelFyRF <- randomForest(classe ~ ., data=subvarTrain, method="class")
+# Perform prediction
+predictRF <- predict(modelFyRF, subvarTest, type = "class")
+```
+
+Following confusion, the matrix shows the errors of the prediction algorithm.
+
+```{r randomforestcm, echo=TRUE}
+confusionMatrix(predictRF, subvarTest$classe)
+```
+
+## Conclusion
+
+### Result
+
+The Confusion Matrices show that the Random Forest algorithm performs better than a Decision Tree. The accuracy for the Random Forest model was 0.995 (95% CI: (0.993, 0.997)) compared to 0.739 (95% CI: (0.727, 0.752)) for Decision Tree model. 
+The Random Forest model is chosen.
+
+### Expected out-of-sample error
+The expected out-of-sample error is estimated at 0.5%. The expected out-of-sample error is calculated as 1 - accuracy for predictions made against the cross-validation set. Our Test data set comprises 20 cases. With an accuracy above 99% on our cross-validation data, we can expect that very few, or none, of the test samples, will be unclassified.
+
+## Submission
+In this section, the files for the project submission are generated using the random forest algorithm on the testing data.
+
+```{r submission, echo=TRUE}
+
+# Perform prediction
+predictSub <- predict(modelFyRF, test_data, type="class")
+predictSub
+
+# Writing into files for submission
+ml_write.files = function(x){
+  y = length(x)
+  for(j in 1:y){
+    file_name = paste0("./data/submission/problem_id_",j,".txt")
+    write.table(x[j],file=file_name,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+ml_write.files(predictSub)
